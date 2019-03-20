@@ -28,8 +28,8 @@ def create_actor_model():
         state_2_input = Input(shape=( maxStep, 1))
         masked_state = Masking( mask_value= -10 )(state_input)
         masked_2_state = Masking(mask_value=-10)( state_2_input)
-        memory_layer = LSTM(128)(masked_state)
-        memory_2_layer = LSTM(128)(masked_2_state)
+        memory_layer = LSTM(128, recurrent_dropout=0.2, dropout=0.2)(masked_state)
+        memory_2_layer = LSTM(128, recurrent_dropout=0.2, dropout=0.2)(masked_2_state)
         memory_output = Concatenate()([memory_layer, memory_2_layer])
         h1 = Dense(256, activation='relu')(memory_output)
         output = Dense(2, activation='softmax')(h1)
@@ -37,7 +37,7 @@ def create_actor_model():
 
         model = Model(input=[state_input, state_2_input], output= [output, output_2])
         # adam = Adam(lr=0.001)
-        model.compile(loss="mse", optimizer=Adam(0.01))
+        model.compile(loss="mse", optimizer=Adam(lr = 0.001, clipnorm = 1.5))
         return model
     else:
         model = load_model('model_a_rnn')
