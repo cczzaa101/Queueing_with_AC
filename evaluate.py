@@ -83,6 +83,18 @@ class MLPModel:
             else: res = action
         return res / ( bufferLength//segmentationLength )
 
+    def get_action_sliding_window(self, state, task):
+        segmentationLength = 5
+        translated = self.state_to_MLP_input(state, True)
+        res = None
+        for i in range( bufferLength -segmentationLength + 1 ):
+            seg1 = translated[ 0 ][ i : i + segmentationLength]
+            seg2 = translated[ 1 ][i : i + segmentationLength]
+            action = self.model.predict( [ [ list(seg1)+ list(seg2) ],  task ] )
+            if(not res is None): res = res + action
+            else: res = action
+        return res / ( bufferLength -segmentationLength + 1 )
+
 
 def action_to_readable(action):
     #coordinate = np.argmax(action)
