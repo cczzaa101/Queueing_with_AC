@@ -51,21 +51,38 @@ class RNNModel:
 
 class MLPModel:
     def __init__(self):
-        self.model = load_model('model_a_10_new')
+        self.model = load_model('model_a_3_8')
         self.model.compile(loss = 'mse', optimizer='adam')
 
-    def state_to_MLP_input(self, state):
+    def state_to_MLP_input(self, state, seperated = False):
         res = copy.deepcopy(state)
         for i in range(len(res)):
             for j in range(len(res[i])):
                 res[i][j] += 1
             while (len(res[i]) < bufferLength):
                 res[i].append(0)
-        return np.array([res[0] + res[1]])
+        if(not seperated):
+            return np.array([res[0] + res[1]])
+        else:
+            return np.array([res[0] , res[1]])
+
 
     def get_action(self, state, task):
         translated = self.state_to_MLP_input(state)
         return self.model.predict( [ translated,  task ] )
+
+    def get_action_segmentation(self, state, task):
+        segmentationLength = 5
+        translated = self.state_to_MLP_input(state, True)
+        res = None
+        for i in range( bufferLength//segmentationLength ):
+            seg1 = translated[ 0 ][ i*segmentationLength: (i+1)*segmentationLength ]
+            seg2 = translated[ 1 ][i * segmentationLength: (i + 1) * segmentationLength]
+            action = self.model.predict( [ [ list(seg1)+ list(seg2) ],  task ] )
+            if(not res is None): res = res + action
+            else: res = action
+        return res / ( bufferLength//segmentationLength )
+
 
 def action_to_readable(action):
     #coordinate = np.argmax(action)
