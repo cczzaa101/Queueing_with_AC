@@ -5,12 +5,6 @@ from keras.layers.merge import Add, Multiply, multiply
 from tensorflow.python.client import device_lib
 from keras.optimizers import Adam
 import keras.backend as K
-from analyze.analyze_utils.testbed import get_concept_node_assignment, get_all_users
-from classes.graph.ising_graph import IsingGraph
-from classes.observation.observation import Observation
-from utils.tools.tree_operations import verify_lowest_0_pair_is_found
-from classes.graph.graph_utils import get_all_lower_level_nodes, get_all_upper_level_nodes
-from classes.concept_node.concept_node import compare_two_concept_nodes
 #from modules.dynamic_programming.value_function_approximation.module_graph.actionTranslator import *
 import copy
 
@@ -45,9 +39,9 @@ class DQN:
     def __init__(self, env, sess, load_model = False):
         self.load_model = load_model
         self.gamma = 0.9
-        self.lr = 0.0001
-        self.eps = 0.99998
-        self.eps_decay_rate = 0.99998
+        self.lr = 0.0003
+        self.eps = 0.99999
+        self.eps_decay_rate = 0.00001
         self.min_eps = 0.005
         self.critic_optimizer = Adam(self.lr)
         self.target_critic_optimizer = Adam(self.lr)
@@ -55,7 +49,7 @@ class DQN:
         self.buffer_header = 0
         self.buffer = []
         self.batch_size = 250
-        self.update_interval = 750
+        self.update_interval = 100
 
         self.sess = sess
         self.env = env
@@ -80,8 +74,10 @@ class DQN:
     def train(self):
         if( len(self.buffer) < self.batch_size ): return
         if(self.buffer_header%self.update_interval==0):
+            #print('haaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+            print(self.eps)
             self.sess.run(self.update_critic)
-        self.eps = max(self.eps*self.eps_decay_rate, self.min_eps)
+        self.eps = max(self.eps-self.eps_decay_rate, self.min_eps)
         train_batch_indexes = np.random.choice(len(self.buffer), self.batch_size)
         train_batch = []
         for i in train_batch_indexes: train_batch.append(self.buffer[i])
@@ -106,8 +102,12 @@ class DQN:
         cur_q_by_eval = self.critic_model.predict([cur_state_data, task_data])
         for ind,action_ind in enumerate(next_actions):
             best_q = next_q_by_target[ind][action_ind]
-            cur_q_by_eval[ind][action_ind] = best_q*self.gamma + reward_data[ind]
-        self.critic_model.fit([cur_state_data, task_data], cur_q_by_eval, epochs = 5, verbose=0)
+            curAction = action_data[ ind ]
+            if(not done):
+                cur_q_by_eval[ind][ curAction ] = best_q*self.gamma + reward_data[ind]
+            else:
+                cur_q_by_eval[ind][ curAction ] = 0
+        self.critic_model.fit([cur_state_data, task_data], cur_q_by_eval, epochs = 1, verbose=0)
 
     def prediction(self, cur_state, task = None):
         if(random.random()<self.eps):
@@ -115,7 +115,7 @@ class DQN:
             return ind
         else:
             q = self.critic_model.predict([cur_state,task])
-            print(q)
+            #print(q)
             best_action = np.argmax(q)
             return best_action
 
@@ -201,9 +201,9 @@ def task_to_matrix(task):
     return np.array([res])
 
 def main():
-    f = open('res.txt','w')
+    f = open('res_DQN.txt','w')
     f.close()
-
+    sum_for_avg = 0
     sess = tf.Session()#config=tf.ConfigProto(log_device_placement=True))
     #print(device_lib.list_local_devices())
     K.set_session(sess)
@@ -213,7 +213,10 @@ def main():
     for round in range(20000):
         if( (round+1)%500 == 0):
             actor_critic.critic_model.save('model_c_dqn')
-        print(round)
+        if(round%100 == 0)and(round!=0):
+            print(round)
+            print(sum_for_avg/100)
+            sum_for_avg = 0
         total_t = 0
         total_correct = 0
         total_incorrect = 0
@@ -260,8 +263,9 @@ def main():
                 #
             if (reward == 0): break
 
-        f = open('res.txt','a+')
-        print('total reward: ', total_reward)
+        f = open('res_DQN.txt','a+')
+        #print('total reward: ', total_reward)
+        sum_for_avg+=total_reward
         f.write(str(total_reward))
         f.write('\n')
         f.close()
